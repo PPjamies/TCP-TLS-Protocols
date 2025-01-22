@@ -22,9 +22,7 @@ fn validate_certificate_size(size: usize) -> Result<()> {
     Ok(())
 }
 
-pub fn load_certificates() -> Result<([u8; 3], Vec<Vec<u8>>)> {
-    let paths = Vec::new(); // todo: load from config
-
+pub fn load_certificates(paths: Vec<String>) -> Result<([u8; 3], Vec<Vec<u8>>)> {
     let mut certs = Vec::new();
     let mut certs_length: usize = 0;
 

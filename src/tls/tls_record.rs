@@ -1,12 +1,7 @@
 use crate::tls::tls_certificate::load_certificates;
 use crate::tls::tls_utils::{generate_random_32_bytes, generate_server_random};
+use std::env;
 
-/* server hello message:
-* protocol version (2 bytes)
-* server random (32 bytes)
-* session id (32 bytes)
-* cipher suite (2 bytes)
-* compression method (1 byte) */
 struct TlsServerHelloRecord {
     message_type: u8,
     protocol_version: [u8; 2],
@@ -18,30 +13,17 @@ struct TlsServerHelloRecord {
 
 impl TlsServerHelloRecord {
     fn new() -> Self {
-        //TODO: place in server config
-        let message_type = 0x02; //HELLO
-        let protocol_version = [0x03, 0x03]; // TLS 1.2
-        let random = generate_server_random();
-        let session_id = generate_random_32_bytes();
-        let cipher_suite = [0x00, 0x3C]; // TLS_RSA_WITH_AES_128_CBC_SHA
-        let compression_method = 0x00; // No compression
-
         TlsServerHelloRecord {
-            message_type,
-            protocol_version,
-            random,
-            session_id,
-            cipher_suite,
-            compression_method,
+            message_type: 0x02,             //HELLO
+            protocol_version: [0x03, 0x03], // TLS 1.2
+            random: generate_server_random(),
+            session_id: generate_random_32_bytes(),
+            cipher_suite: [0x00, 0x3C], // TLS RSA with AES 128 CBC SHA
+            compression_method: 0x00,   // No compression
         }
     }
 }
 
-/* server certificate message:
-* certificate type (1 byte)
-* length (3 bytes) -  total size of certificates list
-* certificates (variable bytes) - list of all tls certificates */
-/* a certificate = (3 bytes - length in big endian) + (bytes - data) */
 struct TlsServerCertificateRecord {
     message_type: u8,
     certificate_type: u8,
@@ -51,25 +33,21 @@ struct TlsServerCertificateRecord {
 
 impl TlsServerCertificateRecord {
     fn new() -> Self {
-        //TODO: place in server config
-        let message_type = 0x0B; // CERTIFICATE
-        let certificate_type = 0x00; //X509
-        let (certificate_length, certificates) =
-            load_certificates().expect("unable to load certificates");
+        let cert_path = env::var("PATH_SERVER_CERT_DIR").expect("Server cert directory not found");
+        let cert_paths = vec![cert_path];
+
+        let (length, certificates) =
+            load_certificates(cert_paths).expect("unable to load certificates");
 
         TlsServerCertificateRecord {
-            message_type,
-            certificate_type,
-            length: certificate_length,
+            message_type: 0x0B,     // CERTIFICATE
+            certificate_type: 0x00, //X509
+            length,
             certificates,
         }
     }
 }
 
-/* server finished message:
-* message_type (1 byte)
-* length (12 bytes - SHA 256) - length of the hash
-* finished hash (variable bytes) - the hash of the entire handshake signed by the server's private key */
 struct TlsServerFinishedRecord {
     message_type: u8,
     length: [u8; 12],
@@ -78,13 +56,11 @@ struct TlsServerFinishedRecord {
 
 impl TlsServerFinishedRecord {
     fn new() -> Self {
-        //TODO: put in config
-        let message_type: u8 = 0x14; // FINISHED
         let length: [u8; 12] = get_hash_length();
         let hash: Vec<u8> = get_server_hash();
 
         TlsServerFinishedRecord {
-            message_type,
+            message_type: 0x14, // FINISHED,
             length,
             hash,
         }

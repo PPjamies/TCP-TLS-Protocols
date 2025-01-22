@@ -107,6 +107,13 @@ Server Hello:
   Server Random: [server_random_bytes]
   Server Hello Done
 
+  /* server hello message:
+  * protocol version (2 bytes)
+  * server random (32 bytes)
+  * session id (32 bytes)
+  * cipher suite (2 bytes)
+  * compression method (1 byte) */
+
 Server Certificate:
   Certificate: [certificate data]
     Version: 3
@@ -117,9 +124,20 @@ Server Certificate:
     Validity: [valid_from] to [valid_to]
     Public Key: [server public key]
 
+    /* server certificate message:
+    * certificate type (1 byte)
+    * length (3 bytes) -  total size of certificates list
+    * certificates (variable bytes) - list of all tls certificates */
+    /* a certificate = (3 bytes - length in big endian) + (bytes - data) */
+
 Server Key Exchange (optional depending on cipher):
   Modulus: [modulus]
   Public Exponent: [public_exponent]
   Signature: [signature]
 
 Server Hello Done
+
+/* server finished message:
+* message_type (1 byte)
+* length (12 bytes - SHA 256) - length of the hash
+* finished hash (variable bytes) - the hash of the entire handshake signed by the server's private key */
