@@ -1,3 +1,4 @@
+use crate::tls::tls_certificate::load_certificates;
 use crate::tls::tls_utils::{generate_random_32_bytes, generate_server_random};
 
 /* server hello message:
@@ -40,12 +41,12 @@ impl TlsServerHelloRecord {
 * certificate type (1 byte)
 * length (3 bytes) -  total size of certificates list
 * certificates (variable bytes) - list of all tls certificates */
-/* a certificate = (3 bytes - length) + (bytes - data) */
+/* a certificate = (3 bytes - length in big endian) + (bytes - data) */
 struct TlsServerCertificateRecord {
     message_type: u8,
     certificate_type: u8,
     length: [u8; 3],
-    certificates: Vec<u8>,
+    certificates: Vec<Vec<u8>>,
 }
 
 impl TlsServerCertificateRecord {
@@ -53,8 +54,8 @@ impl TlsServerCertificateRecord {
         //TODO: place in server config
         let message_type = 0x0B; // CERTIFICATE
         let certificate_type = 0x00; //X509
-        let certificate_length: [u8; 3] = get_server_certificates_length();
-        let certificates: Vec<u8> = get_server_certificates();
+        let (certificate_length, certificates) =
+            load_certificates().expect("unable to load certificates");
 
         TlsServerCertificateRecord {
             message_type,

@@ -11,7 +11,7 @@ use std::io::{Read, Result};
 fn main() {}
 
 fn load_private_key() -> Result<PKey<Private>> {
-    let mut file = File::open("server_private.pem")?;
+    let mut file = File::open("../certs/server_private.pem")?;
     let mut data = Vec::new();
     file.read_to_end(&mut data)?;
 

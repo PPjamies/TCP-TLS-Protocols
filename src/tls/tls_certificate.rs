@@ -1,30 +1,47 @@
-use openssl::x509::X509;
-use std::fs::File;
-use std::io::{Read, Result};
+use crate::tls::tls_utils::{read_file_to_bytes, usize_to_3_bytes};
+use std::io::Error;
 
-// (total size, bytes of the certificate)
-fn load_certificate(path: String) -> Result<([u8; 3], Vec<u8>)> {
-    let mut file = File::open(&path)?;
-    let mut data = Vec::new();
-    file.read_to_end(&mut data)?;
-
-    Ok(X509::from_pem(&data)?)
+#[derive(Debug)]
+pub enum CertificateError {
+    SizeExceedsLimit(usize),
+    IoError(Error),
 }
 
-// (total size of all certificates, all certificates)
-pub fn load_certificates() -> Result<([u8; 3], Vec<u8>)> {
-    // todo: list all certificate paths in config
-    let paths = Vec::new();
+impl From<Error> for CertificateError {
+    fn from(err: Error) -> Self {
+        CertificateError::IoError(err)
+    }
+}
 
-    let mut certificates: Vec<u8> = Vec::new();
+type Result<T> = std::result::Result<T, CertificateError>;
+
+fn validate_certificate_size(size: usize) -> Result<()> {
+    if size > 0xFFFFFF {
+        return Err(CertificateError::SizeExceedsLimit(size));
+    }
+    Ok(())
+}
+
+pub fn load_certificates() -> Result<([u8; 3], Vec<Vec<u8>>)> {
+    let paths = Vec::new(); // todo: load from config
+
+    let mut certs = Vec::new();
+    let mut certs_length: usize = 0;
+
     for path in paths {
-        let (size, certificate_bytes) = load_certificate(path)?;
+        let cert_bytes = read_file_to_bytes(&path)?;
+        let cert_length = cert_bytes.len();
 
-        let certificate: Vec<u8> = size + certificate_bytes;
-        certificates.push(certificate);
+        validate_certificate_size(cert_length)?;
+        validate_certificate_size(certs_length + cert_length)?;
+
+        let mut data = Vec::new();
+        data.extend_from_slice(&usize_to_3_bytes(cert_length));
+        data.extend_from_slice(&cert_bytes);
+
+        certs.push(data);
+        certs_length += cert_length;
     }
 
-    let total_size: [u8; 3] = certificates.len();
-
-    Ok((total_size, certificates))
+    Ok((usize_to_3_bytes(certs_length), certs))
 }

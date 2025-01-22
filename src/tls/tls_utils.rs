@@ -1,4 +1,6 @@
 use ring::rand::{SecureRandom, SystemRandom};
+use std::fs::File;
+use std::io::{BufReader, Read, Result};
 use std::time::SystemTime;
 
 fn generate_unix_timestamp_4_bytes() -> [u8; 4] {
@@ -37,4 +39,20 @@ pub fn generate_server_random() -> [u8; 32] {
     server_random[4..].copy_from_slice(&random_bytes);
 
     server_random
+}
+
+pub fn usize_to_3_bytes(from: usize) -> [u8; 3] {
+    let mut to = [0u8; 3];
+    to[0] = ((from >> 16) & 0xFF) as u8;
+    to[1] = ((from >> 8) & 0xFF) as u8;
+    to[2] = (from & 0xFF) as u8;
+    to
+}
+
+pub fn read_file_to_bytes(path: &String) -> Result<Vec<u8>> {
+    let file = File::open(&path)?;
+    let mut reader = BufReader::new(file);
+    let mut data = Vec::new();
+    reader.read_to_end(&mut data)?;
+    Ok(data)
 }
