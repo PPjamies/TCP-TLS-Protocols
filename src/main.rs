@@ -19,14 +19,6 @@ fn load_private_key() -> Result<PKey<Private>> {
     Ok(PKey::from_rsa(rsa)?)
 }
 
-fn load_certificate() -> Result<X509> {
-    let mut file = File::open("server_cert.pem")?;
-    let mut data = Vec::new();
-    file.read_to_end(&mut data)?;
-
-    Ok(X509::from_pem(&data)?)
-}
-
 fn decrypt_pre_master_secret(
     private_key: &PKey<Private>,
     pre_master_secret: &[u8],
