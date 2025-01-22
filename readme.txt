@@ -61,6 +61,10 @@ Notes:
             - value is encrypted using the server's public key
             - client sends value to server
             - example: pre_master_secret = [tls version (2 bytes)] + [46 bytes of rand data]
+    - server can return multiple x509s:
+        - server certificate
+        - intermediate certificates – Certificates from intermediate Certificate Authorities (CAs) that link the server's certificate to a trusted root certificate
+        - root certificate – trusted by the client (optional, as clients typically have a set of trusted root certificates)
 
 
 AFTER TLS HANDSHAKE:
@@ -93,3 +97,29 @@ AFTER TLS HANDSHAKE:
 - sever will:
     - check the MAC to see if its different, if so, discard the message because there's indication of tampering
     - use the session decryption key to decrypt message
+
+
+EXAMPLE OF SERVER HANDSHAKE RESPONSE
+Server Hello:
+  Protocol Version: TLSv1.2
+  Cipher Suite: TLS_RSA_WITH_AES_128_CBC_SHA
+  Session ID: [session_id]
+  Server Random: [server_random_bytes]
+  Server Hello Done
+
+Server Certificate:
+  Certificate: [certificate data]
+    Version: 3
+    Serial Number: [serial_number]
+    Signature Algorithm: sha256WithRSAEncryption
+    Issuer: [issuer information]
+    Subject: [server subject information]
+    Validity: [valid_from] to [valid_to]
+    Public Key: [server public key]
+
+Server Key Exchange (optional depending on cipher):
+  Modulus: [modulus]
+  Public Exponent: [public_exponent]
+  Signature: [signature]
+
+Server Hello Done
