@@ -1,92 +1,72 @@
 mod tls;
 
-use openssl::hash::{Hasher, MessageDigest};
-use openssl::pkey::{PKey, Private};
-use openssl::rsa::Rsa;
-use openssl::x509::X509;
 use ring::rand::SecureRandom;
-use std::fs::File;
-use std::io::{Read, Result};
+use socket2::{Domain, Protocol, Socket, Type};
+use std::io::{Error, Read, Result, Write};
+use std::net::SocketAddr;
+use std::thread::spawn;
 
-fn main() {}
+fn main() -> Result<()> {
+    let socket: Socket = Socket::new(Domain::IPV4, Type::STREAM, Some(Protocol::TCP))?;
+    let addr: SocketAddr = "127.0.0.1:8080"
+        .parse()
+        .map_err(|e| Error::new(std::io::ErrorKind::InvalidInput, e))?;
 
-fn load_private_key() -> Result<PKey<Private>> {
-    let mut file = File::open("../certs/server_private.pem")?;
-    let mut data = Vec::new();
-    file.read_to_end(&mut data)?;
+    socket.bind(&addr.into())?;
+    socket.listen(128)?;
 
-    let rsa = Rsa::private_key_from_pem(&data)?;
-    Ok(PKey::from_rsa(rsa)?)
+    loop {
+        let (mut client_socket, client_addr) = socket.accept()?;
+
+        spawn(move || {
+            let mut buf = [0u8; 1024];
+            let size = client_socket.read(&mut buf)?;
+            let data_bytes: [u8] = buf[..size];
+
+            message_handler(size, &data_bytes)?;
+
+            Ok(())
+        });
+    }
 }
 
-fn decrypt_pre_master_secret(
-    private_key: &PKey<Private>,
-    pre_master_secret: &[u8],
-) -> Result<Vec<u8>> {
-    let rsa = private_key.rsa()?;
-    let mut decrypt = vec![0; rsa.size() as usize]; // buffer to store decrypted pre master secret
-    let decrypted_len = rsa.private_decrypt(
-        pre_master_secret,
-        &mut decrypt,
-        openssl::rsa::Padding::PKCS1, // padding scheme
-    )?;
-    decrypt.truncate(decrypted_len);
-    Ok(decrypt)
-}
+pub fn message_handler(size: usize, data: &[u8]) -> Result<()> {
+    const TLS_PROTOCOL_VERSION: [u8; 2] = [0x03, 0x03];
+    const TLS_HANDSHAKE: u8 = 0x17;
+    const TLS_CLIENT_HELLO: u8 = 0x01;
+    const TLS_SERVER_HELLO: u8 = 0x02;
+    const TLS_CLIENT_KEY_EXCHANGE: u8 = 0x10;
+    const TLS_SERVER_CERTIFICATE: u8 = 0x0B;
+    const TLS_SERVER_FINISHED: u8 = 0x14;
 
-struct SessionKeys {
-    encryption_key: Vec<u8>,
-    mac_key: Vec<u8>,
-    iv: Vec<u8>,
-}
+    // header
+    let content_type = &data[0];
+    let protocol_version = &data[1..3];
+    let length_message = &data[3..5];
 
-// salt = [client_random + server_random].concat
-// info = b"tls1.2";
-// output_len = 64 bytes
-fn derive_session_keys(
-    pre_master_secret: &[u8],
-    salt: &[u8],
-    info: &[u8],
-    output_len: usize,
-) -> Result<SessionKeys> {
-    // HKDF
+    if protocol_version != TLS_PROTOCOL_VERSION {} // throw error: does not support
+    if length_message != (size - 5) {} // throw error: invalid message length
 
-    // Extract - HMAC(salt, pre-master secret) -> PRK
-    let mut hmac = Hasher::new(MessageDigest::sha256())?;
-    hmac.update(&salt)?;
-    hmac.update(&pre_master_secret)?;
-    let prk = hmac.finish()?;
+    // body
+    let message_type = &data[5];
+    let length_body = &data[6..9];
+    let body = &[9..size];
 
-    // Expand  - HMAC(prk, info+prev_block)
-    let mut blocks = Vec::new(); // block = [encryption key, mac key, IV (maybe), other keys]
-    let mut prev_block = vec![0; output_len];
+    if length_body != body.len() {} //throw error: invalid body length
 
-    while blocks.len() < output_len {
-        let mut hmac = Hasher::new(MessageDigest::sha256())?;
-
-        let mut info_and_prev_block = Vec::new();
-        info_and_prev_block.extend_from_slice(&info);
-        info_and_prev_block.extend_from_slice(&prev_block);
-
-        hmac.update(&prk)?;
-        hmac.update(&info_and_prev_block)?;
-
-        let result = hmac.finish()?;
-        prev_block = result.to_vec();
-
-        blocks.extend_from_slice(&result);
+    match content_type {
+        TLS_HANDSHAKE => {
+            match message_type {
+                TLS_CLIENT_HELLO => {} // parse body to specific struct
+                TLS_SERVER_HELLO => {}
+                TLS_CLIENT_KEY_EXCHANGE => {}
+                TLS_SERVER_CERTIFICATE => {}
+                TLS_SERVER_FINISHED => {}
+                _ => {}
+            }
+        }
+        _ => {}
     }
 
-    blocks.truncate(output_len);
-
-    // for HMAC-SHA256 encryption key = 16 bytes, mac key = 32 bytes, iv = 16 bytes
-    let encryption_key = blocks[0..16].to_vec();
-    let mac_key = blocks[16..48].to_vec();
-    let iv = blocks[48..64].to_vec();
-
-    Ok(SessionKeys {
-        encryption_key,
-        mac_key,
-        iv,
-    })
+    Ok(())
 }
