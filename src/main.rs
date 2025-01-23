@@ -40,33 +40,53 @@ pub fn message_handler(size: usize, data: &[u8]) -> Result<()> {
     const TLS_SERVER_FINISHED: u8 = 0x14;
 
     // header
-    let content_type = &data[0];
-    let protocol_version = &data[1..3];
-    let length_message = &data[3..5];
+    let handshake_type = &data[0];
 
-    if protocol_version != TLS_PROTOCOL_VERSION {} // throw error: does not support
-    if length_message != (size - 5) {} // throw error: invalid message length
+    match handshake_type {
+        TLS_CLIENT_HELLO => {
+            let protocol_version = data[1..3];
+            if protocol_version != TLS_PROTOCOL_VERSION {} //throw error: not supported protocol
 
-    // body
-    let message_type = &data[5];
-    let length_body = &data[6..9];
-    let body = &[9..size];
+            let handshake_size = data[3..5];
+            //validate length
 
-    if length_body != body.len() {} //throw error: invalid body length
-
-    match content_type {
-        TLS_HANDSHAKE => {
-            match message_type {
-                TLS_CLIENT_HELLO => {} // parse body to specific struct
-                TLS_SERVER_HELLO => {}
-                TLS_CLIENT_KEY_EXCHANGE => {}
-                TLS_SERVER_CERTIFICATE => {}
-                TLS_SERVER_FINISHED => {}
-                _ => {}
-            }
         }
+        TLS_SERVER_HELLO => {}
+        TLS_CLIENT_KEY_EXCHANGE => {}
+        TLS_SERVER_CERTIFICATE => {}
+        TLS_SERVER_FINISHED => {}
         _ => {}
     }
 
+    // if protocol_version != TLS_PROTOCOL_VERSION {} // throw error: does not support
+    // if length_message != (size - 5) {} // throw error: invalid message length
+    //
+    // // body
+    // let message_type = &data[5];
+    // let length_body = &data[6..9];
+    // let body = &[9..size];
+    //
+    // if length_body != body.len() {} //throw error: invalid body length
+
+
+
     Ok(())
 }
+
+
+// record_header: RecordHeader {
+//     record_type: 0x16,              // HANDSHAKE
+//     protocol_version: [0x03, 0x03], //TLS 1.2
+//     length: [0x00, 0x03],           // BYTES OF HANDSHAKE HEADER
+// },
+// handshake_header: HandshakeHeader {
+//     handshake_type: 0x01, // CLIENT HELLO
+//     length: [0x00, 0x46], // BYTES OF CLIENT HELLO DATA
+// },
+// hello_record: HelloRecord {
+//     version: [0x03, 0x03],
+//     random: generate_server_random(),
+//     session_id: generate_random_32_bytes(),
+//     cipher_suite: [0x00, 0x3C], // TLS RSA with AES 128 CBC SHA
+//     compression_method: [0x01, 0x00],
+// },

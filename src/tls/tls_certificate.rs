@@ -1,4 +1,6 @@
-use crate::tls::tls_utils::{read_file_to_bytes, usize_to_3_bytes};
+use crate::tls::tls_record::ServerCertificate;
+use crate::tls::tls_utils::{read_file_to_bytes, convert_usize_to_3_bytes};
+use std::env;
 use std::io::Error;
 
 #[derive(Debug)]
@@ -22,24 +24,29 @@ fn validate_certificate_size(size: usize) -> Result<()> {
     Ok(())
 }
 
-pub fn load_certificates(paths: Vec<String>) -> Result<([u8; 3], Vec<Vec<u8>>)> {
-    let mut certs = Vec::new();
-    let mut certs_length: usize = 0;
+pub fn load_certificates() -> Result<([u8; 3], Vec<ServerCertificate>)> {
+    //todo: handle this gracefully
+    let cert_path = env::var("PATH_SERVER_CERT_DIR").expect("Server cert directory not found");
+    let paths = vec![cert_path];
+
+    let mut certs: Vec<ServerCertificate> = Vec::new();
 
     for path in paths {
         let cert_bytes = read_file_to_bytes(&path)?;
         let cert_length = cert_bytes.len();
 
         validate_certificate_size(cert_length)?;
-        validate_certificate_size(certs_length + cert_length)?;
 
-        let mut data = Vec::new();
-        data.extend_from_slice(&usize_to_3_bytes(cert_length));
-        data.extend_from_slice(&cert_bytes);
+        let server_certificate = ServerCertificate {
+            length: convert_usize_to_3_bytes(cert_length),
+            certificate: cert_bytes,
+        };
 
-        certs.push(data);
-        certs_length += cert_length;
+        certs.push(server_certificate);
     }
 
-    Ok((usize_to_3_bytes(certs_length), certs))
+    validate_certificate_size(certs.len())?;
+    let certs_length = convert_usize_to_3_bytes(certs.len());
+
+    Ok((certs_length, certs))
 }

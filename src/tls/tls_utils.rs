@@ -3,6 +3,14 @@ use std::fs::File;
 use std::io::{BufReader, Read, Result};
 use std::time::SystemTime;
 
+pub fn read_file_to_bytes(path: &String) -> Result<Vec<u8>> {
+    let file = File::open(&path)?;
+    let mut reader = BufReader::new(file);
+    let mut data = Vec::new();
+    reader.read_to_end(&mut data)?;
+    Ok(data)
+}
+
 fn generate_unix_timestamp_4_bytes() -> [u8; 4] {
     let now: u32 = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
@@ -41,7 +49,7 @@ pub fn generate_server_random() -> [u8; 32] {
     server_random
 }
 
-pub fn usize_to_3_bytes(from: usize) -> [u8; 3] {
+pub fn convert_usize_to_3_bytes(from: usize) -> [u8; 3] {
     let mut to = [0u8; 3];
     to[0] = ((from >> 16) & 0xFF) as u8;
     to[1] = ((from >> 8) & 0xFF) as u8;
@@ -49,10 +57,11 @@ pub fn usize_to_3_bytes(from: usize) -> [u8; 3] {
     to
 }
 
-pub fn read_file_to_bytes(path: &String) -> Result<Vec<u8>> {
-    let file = File::open(&path)?;
-    let mut reader = BufReader::new(file);
-    let mut data = Vec::new();
-    reader.read_to_end(&mut data)?;
-    Ok(data)
+pub fn convert_3_bytes_to_usize(from: &[u8; 3]) -> usize {
+    ((from[0] as usize) << 16) | ((from[1] as usize) << 8) | (from[2] as usize)
+}
+
+pub fn add_to_3_byte_u8_array(arr: &[u8; 3], value: usize) -> [u8; 3] {
+    let total = convert_3_bytes_to_usize(&arr) + value;
+    convert_usize_to_3_bytes(total)
 }
