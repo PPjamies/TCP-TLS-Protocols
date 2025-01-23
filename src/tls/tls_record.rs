@@ -110,24 +110,44 @@ impl ServerCertificateRecord {
 }
 
 #[derive(Debug)]
-pub struct ClientKeyExchangeRecord {}
-
-#[derive(Debug)]
-pub struct ServerFinishedRecord {
-    message_type: u8,
-    length: [u8; 12],
-    hash: Vec<u8>,
+pub struct Signature {
+    signature_type: [u8; 2],
+    length: [u8; 2],
+    signature: Vec<u8>,
 }
 
-impl ServerFinishedRecord {
-    fn new() -> Self {
-        let length: [u8; 12] = get_hash_length();
-        let hash: Vec<u8> = get_server_hash();
+#[derive(Debug)]
+pub struct ServerCertificateVerifyRecord {
+    handshake_header: HandshakeHeader,
+    signature: Vec<u8>,
+}
 
-        ServerFinishedRecord {
-            message_type: 0x14, // FINISHED,
-            length,
-            hash,
+impl ServerCertificateVerifyRecord {
+    fn new() -> Self {
+        Self {
+            handshake_header: HandshakeHeader {
+                handshake_type: 0x0f,
+                length: [],
+            },
+            signature: Vec::new(),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct HandshakeFinishedRecord {
+    handshake_header: HandshakeHeader,
+    verify_record: Vec<u8>,
+}
+
+impl HandshakeFinishedRecord {
+    fn new() -> Self {
+        Self {
+            handshake_header: HandshakeHeader {
+                handshake_type: 0x014,
+                length: [],
+            },
+            verify_record: Vec::new(),
         }
     }
 }
