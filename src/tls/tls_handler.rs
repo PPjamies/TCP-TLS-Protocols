@@ -17,10 +17,10 @@ const TLS_SERVER_HELLO: u8 = 0x02;
 const TLS_SERVER_CERTIFICATE: u8 = 0x0B;
 const TLS_SERVER_CERTIFICATE_VERIFY: u8 = 0x0f;
 const TLS_HANDSHAKE_FINISHED: u8 = 0x14;
-const TLS_NEW_SESSION_TICKET: u8 = 0x04;
-const TLS_NEW_SESSION_TICKET_LIFETIME: [u8; 4] = [0x00, 0x00, 0x1c, 0x20];
-const TLS_NEW_SESSION_AGE_ADD: [u8; 4] = [0u8; 4];
-const TLS_NEW_SESSION_TICKET_NONCE: [u8; 9] = [0u8; 9];
+const TLS_SERVER_NEW_SESSION_TICKET: u8 = 0x04;
+const TLS_SERVER_NEW_SESSION_TICKET_LIFETIME: [u8; 4] = [0x00, 0x00, 0x1c, 0x20];
+const TLS_SERVER_SESSION_AGE_ADD: [u8; 4] = [0u8; 4];
+const TLS_SERVER_NEW_SESSION_TICKET_NONCE: [u8; 9] = [0u8; 9];
 
 #[derive(Debug)]
 pub enum TlsHandlerError {
@@ -217,12 +217,12 @@ fn get_server_handshake_finished_record() -> Result<HandshakeFinishedRecord, Tls
 fn get_server_new_session_ticket_record() -> Result<NewSessionTicketRecord, TlsHandlerError> {
     Ok(NewSessionTicketRecord {
         handshake_header: HandshakeHeader {
-            handshake_type: TLS_NEW_SESSION_TICKET,
+            handshake_type: TLS_SERVER_NEW_SESSION_TICKET,
             data_message_length: [],
         },
-        ticket_lifetime: TLS_NEW_SESSION_TICKET_LIFETIME,
-        ticket_age_add: TLS_NEW_SESSION_AGE_ADD,
-        ticket_nonce: TLS_NEW_SESSION_TICKET_NONCE,
+        ticket_lifetime: TLS_SERVER_NEW_SESSION_TICKET_LIFETIME,
+        ticket_age_add: TLS_SERVER_SESSION_AGE_ADD,
+        ticket_nonce: TLS_SERVER_NEW_SESSION_TICKET_NONCE,
         session_ticket: vec![],
     })
 }
