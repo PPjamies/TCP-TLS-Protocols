@@ -1,153 +1,69 @@
-use crate::tls::tls_certificate::load_certificates;
-use crate::tls::tls_utils::{
-    add_to_3_byte_u8_array, generate_random_32_bytes, generate_server_random,
-};
-
 #[derive(Debug)]
 pub struct RecordHeader {
-    record_type: u8,
-    protocol_version: [u8; 2],
-    length: [u8; 2],
+    pub record_type: u8,
+    pub protocol_version: [u8; 2],
+    pub handshake_message_length: [u8; 2],
 }
 
 #[derive(Debug)]
 pub struct HandshakeHeader {
-    handshake_type: u8,
-    length: [u8; 3],
+    pub handshake_type: u8,
+    pub data_message_length: [u8; 3],
 }
 
 #[derive(Debug)]
 pub struct HelloRecord {
-    version: [u8; 2],
-    random: [u8; 32],
-    session_id: [u8; 32],
-    cipher_suite: [u8; 2],
-    compression_method: [u8; 2],
+    pub record_header: RecordHeader,
+    pub handshake_header: HandshakeHeader,
+    pub version: [u8; 2],
+    pub random: [u8; 32],
+    pub session_id: [u8; 32],
+    pub cipher_suites: Vec<u8>,
 }
 
 #[derive(Debug)]
-pub struct ClientHelloRecord {
-    record_header: RecordHeader,
-    handshake_header: HandshakeHeader,
-    hello_record: HelloRecord,
-}
-
-impl ClientHelloRecord {
-    fn new(
-        record_header: RecordHeader,
-        handshake_header: HandshakeHeader,
-        hello_record: HelloRecord,
-    ) -> Self {
-        Self {
-            record_header,
-            handshake_header,
-            hello_record,
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct ServerHelloRecord {
-    record_header: RecordHeader,
-    handshake_header: HandshakeHeader,
-    hello_record: HelloRecord,
-}
-
-impl ServerHelloRecord {
-    fn new() -> Self {
-        Self {
-            record_header: RecordHeader {
-                record_type: 0x16,              // HANDSHAKE
-                protocol_version: [0x03, 0x03], //TLS 1.2
-                length: [0x00, 0x03],           // BYTES OF HANDSHAKE HEADER
-            },
-            handshake_header: HandshakeHeader {
-                handshake_type: 0x02,       // CLIENT HELLO
-                length: [0x00, 0x00, 0x46], // BYTES OF CLIENT HELLO DATA
-            },
-            hello_record: HelloRecord {
-                version: [0x03, 0x03],
-                random: generate_server_random(),
-                session_id: generate_random_32_bytes(),
-                cipher_suite: [0x00, 0x3C], // TLS RSA with AES 128 CBC SHA
-                compression_method: [0x01, 0x00],
-            },
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct ServerCertificate {
-    pub length: [u8; 3],
+pub struct Certificate {
+    pub length: Vec<u8>,
     pub certificate: Vec<u8>,
 }
 
 #[derive(Debug)]
-pub struct ServerCertificateRecord {
-    handshake_header: HandshakeHeader,
-    request_context: u8,
-    certificates_length: [u8; 3],
-    certificates: Vec<ServerCertificate>,
-}
-
-impl ServerCertificateRecord {
-    fn new() -> Self {
-        let (certificates_length, certificates) =
-            load_certificates().expect("unable to load certificates");
-
-        let length = add_to_3_byte_u8_array(&certificates_length, 4);
-
-        ServerCertificateRecord {
-            handshake_header: HandshakeHeader {
-                handshake_type: 0x0B,
-                length,
-            },
-            request_context: 0x00,
-            certificates_length,
-            certificates,
-        }
-    }
+pub struct CertificateRecord {
+    pub handshake_header: HandshakeHeader,
+    pub request_context: u8,
+    pub certificates_length: Vec<u8>,
+    pub certificates: Vec<Certificate>,
 }
 
 #[derive(Debug)]
 pub struct Signature {
-    signature_type: [u8; 2],
-    length: [u8; 2],
-    signature: Vec<u8>,
+    pub signature_type: [u8; 2],
+    pub length: Vec<u8>,
+    pub signature: Vec<u8>,
 }
 
 #[derive(Debug)]
-pub struct ServerCertificateVerifyRecord {
-    handshake_header: HandshakeHeader,
-    signature: Vec<u8>,
-}
-
-impl ServerCertificateVerifyRecord {
-    fn new() -> Self {
-        Self {
-            handshake_header: HandshakeHeader {
-                handshake_type: 0x0f,
-                length: [],
-            },
-            signature: Vec::new(),
-        }
-    }
+pub struct CertificateVerifyRecord {
+    pub handshake_header: HandshakeHeader,
+    pub signature: Vec<u8>,
 }
 
 #[derive(Debug)]
 pub struct HandshakeFinishedRecord {
-    handshake_header: HandshakeHeader,
-    verify_record: Vec<u8>,
+    pub handshake_header: HandshakeHeader,
+    pub verify_data: Vec<u8>,
 }
 
-impl HandshakeFinishedRecord {
-    fn new() -> Self {
-        Self {
-            handshake_header: HandshakeHeader {
-                handshake_type: 0x014,
-                length: [],
-            },
-            verify_record: Vec::new(),
-        }
-    }
+#[derive(Debug)]
+pub struct NewSessionTicketRecord {
+    pub handshake_header: HandshakeHeader,
+    pub ticket_lifetime: [u8; 4],
+    pub ticket_age_add: [u8; 4],
+    pub ticket_nonce: [u8; 9],
+    pub session_ticket: Vec<u8>,
+}
+
+#[derive(Debug)]
+pub struct ApplicationData {
+    pub payload: Vec<u8>,
 }
