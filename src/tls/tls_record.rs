@@ -22,17 +22,12 @@ pub struct HelloRecord {
 }
 
 #[derive(Debug)]
-pub struct Certificate {
-    pub length: Vec<u8>,
-    pub certificate: Vec<u8>,
-}
-
-#[derive(Debug)]
 pub struct CertificateRecord {
     pub handshake_header: HandshakeHeader,
     pub request_context: u8,
-    pub certificates_length: Vec<u8>,
-    pub certificates: Vec<Certificate>,
+    pub certificates_length: [u8; 3],
+    pub certificate_length: [u8; 3],
+    pub certificate: Vec<u8>,
 }
 
 #[derive(Debug)]
