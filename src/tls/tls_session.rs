@@ -1,4 +1,7 @@
-use crate::tls::tls_record::{CertificateRecord, CertificateVerifyRecord, HelloRecord};
+use crate::tls::tls_record::{
+    ApplicationDataRecord, ChangeCipherSpecRecord, HelloRecord, KeyExchangeRecord,
+    ServerCertificateRecord, ServerHelloDoneRecord,
+};
 use openssl::hash::{Hasher, MessageDigest};
 use openssl::pkey::{PKey, Private};
 use openssl::rsa::Rsa;
@@ -9,8 +12,31 @@ use std::io::{Read, Result};
 pub struct SessionContext {
     pub client_hello_record: Option<HelloRecord>,
     pub server_hello_record: Option<HelloRecord>,
-    pub certificate_record: Option<CertificateRecord>,
-    pub certificate_verify_record: Option<CertificateVerifyRecord>,
+    pub server_certificate_record: Option<ServerCertificateRecord>,
+    pub server_key_exchange_record: Option<KeyExchangeRecord>,
+    pub server_hello_done_record: Option<ServerHelloDoneRecord>,
+    pub client_key_exchange_record: Option<KeyExchangeRecord>,
+    pub client_change_cipher_spec_record: Option<ChangeCipherSpecRecord>,
+    pub client_handshake_finished_record: Option<ApplicationDataRecord>,
+    pub server_change_cipher_spec_record: Option<ChangeCipherSpecRecord>,
+    pub server_handshake_finished_record: Option<ApplicationDataRecord>,
+}
+
+impl SessionContext {
+    pub fn new() -> SessionContext {
+        Self {
+            client_hello_record: None,
+            server_hello_record: None,
+            server_certificate_record: None,
+            server_key_exchange_record: None,
+            server_hello_done_record: None,
+            client_key_exchange_record: None,
+            client_change_cipher_spec_record: None,
+            client_handshake_finished_record: None,
+            server_change_cipher_spec_record: None,
+            server_handshake_finished_record: None,
+        }
+    }
 }
 
 #[derive(Debug)]
