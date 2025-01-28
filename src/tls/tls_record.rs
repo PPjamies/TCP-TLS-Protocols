@@ -22,7 +22,7 @@ pub struct HelloRecord {
     pub cipher_suites: Vec<[u8; 2]>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ServerCertificateRecord {
     pub handshake_header: HandshakeHeader,
     pub request_context: u8,
@@ -31,7 +31,13 @@ pub struct ServerCertificateRecord {
     pub certificate: Vec<u8>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
+pub struct ServerHelloDoneRecord {
+    pub record_header: RecordHeader,
+    pub handshake_header: HandshakeHeader,
+}
+
+#[derive(Debug, Clone)]
 pub struct KeyExchangeRecord {
     pub record_header: RecordHeader,
     pub handshake_header: HandshakeHeader,
@@ -39,18 +45,15 @@ pub struct KeyExchangeRecord {
     pub signature: Option<Vec<u8>>,
 }
 
-#[derive(Debug)]
-pub struct ServerHelloDoneRecord {
-    pub record_header: RecordHeader,
-    pub handshake_header: HandshakeHeader,
-}
-
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ChangeCipherSpecRecord {
-    pub record_header: RecordHeader,
+    pub record_type: u8,
+    pub protocol_version: [u8; 2],
+    pub change_cipher_specs_length: [u8; 2],
+    pub change_cipher_specs: u8,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ApplicationDataRecord {
     // used for handshake finished records as well
     pub record_header: RecordHeader,

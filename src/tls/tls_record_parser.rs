@@ -1,11 +1,19 @@
-use crate::tls::tls_record::{
-    ApplicationDataRecord, ChangeCipherSpecRecord, HandshakeHeader, HelloRecord, KeyExchangeRecord,
-    RecordHeader,
-};
+use crate::tls::tls_record::{ApplicationDataRecord, ChangeCipherSpecRecord, HandshakeHeader, HelloRecord, KeyExchangeRecord, RecordHeader};
 
-use nom::combinator::opt;
 use nom::multi::count;
 use nom::{bytes::complete::take, IResult, Parser};
+use nom::combinator::opt;
+
+pub fn parse_record_type(input: &[u8]) -> IResult<&[u8], u8> {
+    let (input, record_type) = take(1usize)(input)?;
+    Ok((input, record_type[0]))
+}
+
+pub fn parse_handshake_type(input: &[u8]) -> IResult<&[u8], u8> {
+    parse_record_header(input)?;
+    let (input, handshake_type) = take(1usize)(input)?;
+    Ok((input, handshake_type[0]))
+}
 
 pub fn parse_record_header(input: &[u8]) -> IResult<&[u8], RecordHeader> {
     (take(1usize), take(2usize), take(2usize))
@@ -82,8 +90,23 @@ pub fn parse_key_exchange_record(input: &[u8]) -> IResult<&[u8], KeyExchangeReco
 }
 
 pub fn parse_change_cipher_spec_record(input: &[u8]) -> IResult<&[u8], ChangeCipherSpecRecord> {
-    let (input, record_header) = parse_record_header(input)?;
-    Ok((input, ChangeCipherSpecRecord { record_header }))
+    let (input, record_type) = take(1usize)(input)?;
+    let (input, protocol_version) = take(2usize)(input)?;
+    let (input, change_cipher_specs_length) = take(2usize)(input)?;
+    let (input, change_cipher_specs) = take(1usize)(input)?;
+
+    Ok((
+        input,
+        ChangeCipherSpecRecord {
+            record_type: record_type[0],
+            protocol_version: [protocol_version[0], protocol_version[1]],
+            change_cipher_specs_length: [
+                change_cipher_specs_length[0],
+                change_cipher_specs_length[1],
+            ],
+            change_cipher_specs: change_cipher_specs[0],
+        },
+    ))
 }
 
 pub fn parse_application_data_record(input: &[u8]) -> IResult<&[u8], ApplicationDataRecord> {

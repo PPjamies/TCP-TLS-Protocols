@@ -1,7 +1,4 @@
-use crate::tls::tls_record::{
-    ApplicationDataRecord, ChangeCipherSpecRecord, HelloRecord, KeyExchangeRecord,
-    ServerCertificateRecord, ServerHelloDoneRecord,
-};
+use crate::tls::tls_record::{ApplicationDataRecord, ChangeCipherSpecRecord, HelloRecord, KeyExchangeRecord, ServerCertificateRecord, ServerHelloDoneRecord};
 use openssl::hash::{Hasher, MessageDigest};
 use openssl::pkey::{PKey, Private};
 use openssl::rsa::Rsa;
@@ -13,7 +10,6 @@ pub struct SessionContext {
     pub client_hello_record: Option<HelloRecord>,
     pub server_hello_record: Option<HelloRecord>,
     pub server_certificate_record: Option<ServerCertificateRecord>,
-    pub server_key_exchange_record: Option<KeyExchangeRecord>,
     pub server_hello_done_record: Option<ServerHelloDoneRecord>,
     pub client_key_exchange_record: Option<KeyExchangeRecord>,
     pub client_change_cipher_spec_record: Option<ChangeCipherSpecRecord>,
@@ -28,7 +24,6 @@ impl SessionContext {
             client_hello_record: None,
             server_hello_record: None,
             server_certificate_record: None,
-            server_key_exchange_record: None,
             server_hello_done_record: None,
             client_key_exchange_record: None,
             client_change_cipher_spec_record: None,
