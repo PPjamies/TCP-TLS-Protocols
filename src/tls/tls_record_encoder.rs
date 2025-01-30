@@ -1,6 +1,6 @@
 use crate::tls::tls_record::{
     ApplicationDataRecord, ChangeCipherSpecRecord, HandshakeHeader, HelloRecord, RecordHeader,
-    ServerHelloDoneRecord,
+    ServerCertificateRecord, ServerHelloDoneRecord,
 };
 
 pub fn encode_record_header(record_header: &RecordHeader) -> [u8; 5] {
@@ -35,7 +35,24 @@ pub fn encode_hello_record(hello_record: &HelloRecord) -> Vec<u8> {
     data_bytes
 }
 
-pub fn encode_server_hello_done_record(server_hello_done_record: ServerHelloDoneRecord) -> [u8; 9] {
+pub fn encode_server_certificate_record(
+    server_certificate_record: &ServerCertificateRecord,
+) -> Vec<u8> {
+    let record_header = encode_record_header(&server_certificate_record.record_header);
+    let handshake_header = encode_handshake_header(&server_certificate_record.handshake_header);
+
+    let mut data_bytes: Vec<u8> = Vec::new();
+    data_bytes.extend_from_slice(&record_header);
+    data_bytes.extend_from_slice(&handshake_header);
+    data_bytes.extend_from_slice(&server_certificate_record.certificates_length);
+    data_bytes.extend_from_slice(&server_certificate_record.certificate_length);
+    data_bytes.extend_from_slice(&server_certificate_record.certificate);
+    data_bytes
+}
+
+pub fn encode_server_hello_done_record(
+    server_hello_done_record: &ServerHelloDoneRecord,
+) -> [u8; 9] {
     let record_header = encode_record_header(&server_hello_done_record.record_header);
     let handshake_header = encode_handshake_header(&server_hello_done_record.handshake_header);
 

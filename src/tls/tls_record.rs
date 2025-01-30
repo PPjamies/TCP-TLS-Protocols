@@ -24,8 +24,8 @@ pub struct HelloRecord {
 
 #[derive(Debug, Clone)]
 pub struct ServerCertificateRecord {
+    pub record_header: RecordHeader,
     pub handshake_header: HandshakeHeader,
-    pub request_context: u8,
     pub certificates_length: [u8; 3],
     pub certificate_length: [u8; 3],
     pub certificate: Vec<u8>,
@@ -41,8 +41,7 @@ pub struct ServerHelloDoneRecord {
 pub struct KeyExchangeRecord {
     pub record_header: RecordHeader,
     pub handshake_header: HandshakeHeader,
-    pub public_key: [u8; 32],
-    pub signature: Option<Vec<u8>>,
+    pub premaster_secret: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]

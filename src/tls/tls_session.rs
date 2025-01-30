@@ -1,4 +1,7 @@
-use crate::tls::tls_record::{ApplicationDataRecord, ChangeCipherSpecRecord, HelloRecord, KeyExchangeRecord, ServerCertificateRecord, ServerHelloDoneRecord};
+use crate::tls::tls_record::{
+    ApplicationDataRecord, ChangeCipherSpecRecord, HelloRecord, KeyExchangeRecord,
+    ServerCertificateRecord, ServerHelloDoneRecord,
+};
 use openssl::hash::{Hasher, MessageDigest};
 use openssl::pkey::{PKey, Private};
 use openssl::rsa::Rsa;
@@ -32,14 +35,30 @@ impl SessionContext {
             server_handshake_finished_record: None,
         }
     }
+    pub fn get_client_random(&mut self) -> [u8; 32] {
+        self.client_hello_record.as_ref().unwrap().random
+    }
+    pub fn get_server_random(&self) -> [u8; 32] {
+        self.server_hello_record.as_ref().unwrap().random
+    }
+    pub fn get_server_session_id(&self) -> [u8; 32] {
+        self.server_hello_record.as_ref().unwrap().session_id
+    }
 }
 
 #[derive(Debug)]
 pub struct SessionState {
-    pub session_id: [u8; 32],
-    pub cipher_suite: Vec<u8>,
-    pub pre_master_secret: Vec<u8>,
-    pub session_keys: SessionKeys,
+    pub session_id: Option<[u8; 32]>,
+    pub session_keys: Option<SessionKeys>,
+}
+
+impl SessionState {
+    pub fn new() -> SessionState {
+        Self {
+            session_id: None,
+            session_keys: None,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -58,14 +77,12 @@ fn load_private_key() -> Result<PKey<Private>> {
     Ok(PKey::from_rsa(rsa)?)
 }
 
-fn decrypt_pre_master_secret(
-    private_key: &PKey<Private>,
-    pre_master_secret: &[u8],
-) -> Result<Vec<u8>> {
+fn decrypt_premaster_secret(premaster_secret: &[u8]) -> Result<Vec<u8>> {
+    let private_key = load_private_key()?;
     let rsa = private_key.rsa()?;
     let mut decrypt = vec![0; rsa.size() as usize]; // buffer to store decrypted pre master secret
     let decrypted_len = rsa.private_decrypt(
-        pre_master_secret,
+        premaster_secret,
         &mut decrypt,
         openssl::rsa::Padding::PKCS1, // padding scheme
     )?;
@@ -73,24 +90,39 @@ fn decrypt_pre_master_secret(
     Ok(decrypt)
 }
 
-// salt = [client_random + server_random].concat
-// info = b"tls1.2";
-// output_len = 64 bytes
+pub fn get_session_keys(
+    encrypted_premaster_secret: &[u8],
+    server_random: &[u8],
+    client_random: &[u8],
+) -> Result<SessionKeys> {
+    let premaster_secret = decrypt_premaster_secret(encrypted_premaster_secret)?;
+
+    let mut salt = [0u8; 64];
+    salt.copy_from_slice(server_random);
+    salt.copy_from_slice(client_random);
+
+    let info = b"tls1.2";
+    let output_len = 64usize;
+
+    let session_keys: SessionKeys =
+        derive_session_keys(&premaster_secret, &salt, &info, output_len)?;
+    Ok(session_keys)
+}
+
 fn derive_session_keys(
-    pre_master_secret: &[u8],
+    premaster_secret: &[u8],
     salt: &[u8],
     info: &[u8],
     output_len: usize,
 ) -> Result<SessionKeys> {
     // HKDF
-
-    // Extract - HMAC(salt, pre-master secret) -> PRK
+    // Extract - HMAC(salt, premaster_secret) -> PRK
     let mut hmac = Hasher::new(MessageDigest::sha256())?;
     hmac.update(&salt)?;
-    hmac.update(&pre_master_secret)?;
+    hmac.update(&premaster_secret)?;
     let prk = hmac.finish()?;
 
-    // Expand  - HMAC(prk, info+prev_block)
+    // Expand - HMAC(prk, info + prev_block)
     let mut blocks = Vec::new(); // block = [encryption key, mac key, IV (maybe), other keys]
     let mut prev_block = vec![0; output_len];
 
@@ -112,7 +144,10 @@ fn derive_session_keys(
 
     blocks.truncate(output_len);
 
-    // for HMAC-SHA256 encryption key = 16 bytes, mac key = 32 bytes, iv = 16 bytes
+    // (HMAC-SHA256)
+    // encryption key = 16 bytes
+    // mac key = 32 bytes
+    // iv = 16 bytes
     let encryption_key = blocks[0..16].to_vec();
     let mac_key = blocks[16..48].to_vec();
     let iv = blocks[48..64].to_vec();
