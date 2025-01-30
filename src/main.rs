@@ -1,6 +1,6 @@
 mod tls;
 
-use crate::tls::{handle, SessionContext};
+use crate::tls::{handle, SessionContext, SessionState};
 use ring::rand::SecureRandom;
 use socket2::{Domain, Protocol, Socket, Type};
 use std::io::{Error, Read, Result, Write};
@@ -18,14 +18,15 @@ fn main() -> Result<()> {
 
     loop {
         let (mut client_socket, _) = socket.accept()?;
-        let mut session_context: SessionContext = SessionContext::new();
+        let mut state = SessionState::new();
+        let mut context = SessionContext::new();
 
         spawn(move || {
             let mut buf = [0u8; 1024];
             let size = client_socket.read(&mut buf)?;
             let data_bytes: [u8] = buf[..size];
 
-            handle(&mut session_context, &data_bytes)?;
+            handle(&mut client_socket, &mut state, &mut context, &data_bytes)?;
 
             Ok(())
         });
