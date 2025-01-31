@@ -6,6 +6,7 @@ use crate::tls::tls_session::*;
 use socket2::Socket;
 use std::io::Write;
 use std::net::Shutdown;
+use crate::tls::tls_error::TlsHandlerError;
 
 pub fn handle(
     mut socket: &Socket,
