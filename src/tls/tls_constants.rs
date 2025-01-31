@@ -1,7 +1,7 @@
 use crate::tls::tls_record::{
     ChangeCipherSpecRecord, HandshakeHeader, HelloRecord, RecordHeader, ServerHelloDoneRecord,
 };
-use crate::tls::tls_utils::generate_server_random;
+use crate::tls::tls_utils::{generate_random_32_bytes, generate_server_random};
 
 pub static TLS_PROTOCOL_VERSION: [u8; 2] = [0x03, 0x03]; // TLS 1.2
 pub static TLS_RSA_AES_128_CBC_SHA_256: [u8; 2] = [0x00, 0x3C];
@@ -28,7 +28,7 @@ pub static TLS_SERVER_HELLO: HelloRecord = HelloRecord {
     },
     version: TLS_PROTOCOL_VERSION,
     random: generate_server_random(),
-    session_id: generate_server_random(),
+    session_id: generate_random_32_bytes(),
     cipher_suites_length: [0x00, 0x02],
     cipher_suites: vec![TLS_RSA_AES_128_CBC_SHA_256],
 };
