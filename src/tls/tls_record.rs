@@ -62,6 +62,6 @@ pub struct HandshakeFinishedRecord {
 pub struct ApplicationDataRecord {
     // used for handshake finished records as well
     pub record_header: RecordHeader,
-    pub encryption_iv: [u8; 16],
+    pub encryption_iv: Vec<u8>,
     pub encrypted_data: Vec<u8>,
 }
