@@ -49,14 +49,10 @@ pub fn read_file_to_bytes(path: &String) -> Result<Vec<u8>> {
     Ok(data)
 }
 
-pub fn convert_usize_to_bytes(from: usize) -> Vec<u8> {
-    let mut to = Vec::new();
-    let mut value = from;
-    while value > 0 {
-        to.push((value & 0xFF) as u8);
-        value >>= 8;
-    }
-    to.reverse();
+pub fn convert_usize_to_2_bytes(from: usize) -> [u8; 2] {
+    let mut to = [0u8; 2];
+    to[0] = ((from >> 8) & 0xFF) as u8;
+    to[1] = (from & 0xFF) as u8;
     to
 }
 

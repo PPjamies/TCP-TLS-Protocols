@@ -1,10 +1,37 @@
-use crate::tls::tls_constants::{TLS_HANDSHAKE_MESSAGE_LENGTH, TLS_HANDSHAKE_SERVER_CERTIFICATE, TLS_PROTOCOL_VERSION, TLS_RECORD_HANDSHAKE, TLS_SERVER_CHANGE_CIPHER_SPEC, TLS_SERVER_HELLO, TLS_SERVER_HELLO_DONE};
-use crate::tls::tls_record::{
-    ApplicationDataRecord, ChangeCipherSpecRecord, HandshakeHeader, HelloRecord, RecordHeader,
-    ServerCertificateRecord, ServerHelloDoneRecord,
+use crate::tls::tls_constants::{
+    TLS_HANDSHAKE_FINISHED, TLS_HANDSHAKE_MESSAGE_LENGTH, TLS_HANDSHAKE_SERVER_CERTIFICATE,
+    TLS_PROTOCOL_VERSION, TLS_RECORD_HANDSHAKE, TLS_SERVER_CHANGE_CIPHER_SPEC, TLS_SERVER_HELLO,
+    TLS_SERVER_HELLO_DONE,
 };
-use crate::tls::tls_utils::{convert_usize_to_3_bytes, convert_usize_to_bytes, read_file_to_bytes};
+use crate::tls::tls_record::{
+    ApplicationDataRecord, ChangeCipherSpecRecord, HandshakeFinishedRecord, HandshakeHeader,
+    HelloRecord, RecordHeader, ServerCertificateRecord, ServerHelloDoneRecord,
+};
+use crate::tls::tls_session::compute_verify_data;
+use crate::tls::tls_utils::{
+    convert_usize_to_2_bytes, convert_usize_to_3_bytes, read_file_to_bytes,
+};
+use crate::tls::{SessionContext, SessionState};
 use std::env;
+
+#[derive(Debug)]
+pub enum EncoderError {
+    CertificateEnvVarReadError,
+    CertificateReadError,
+}
+impl std::fmt::Display for EncoderError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            EncoderError::CertificateEnvVarReadError => {
+                write!(f, "Unable to read environment variable")
+            }
+            EncoderError::CertificateReadError => {
+                write!(f, "Unable to read certificate")
+            }
+        }
+    }
+}
+impl std::error::Error for EncoderError {}
 
 fn encode_record_header(record_header: &RecordHeader) -> [u8; 5] {
     let mut data_bytes: [u8; 5] = [0u8; 5];
@@ -53,9 +80,7 @@ fn encode_server_certificate_record(
     data_bytes
 }
 
-fn encode_server_hello_done_record(
-    server_hello_done_record: &ServerHelloDoneRecord,
-) -> [u8; 9] {
+fn encode_server_hello_done_record(server_hello_done_record: &ServerHelloDoneRecord) -> [u8; 9] {
     let record_header = encode_record_header(&server_hello_done_record.record_header);
     let handshake_header = encode_handshake_header(&server_hello_done_record.handshake_header);
 
@@ -65,14 +90,23 @@ fn encode_server_hello_done_record(
     data_bytes
 }
 
-fn encode_change_cipher_spec_record(
-    change_cipher_spec_record: &ChangeCipherSpecRecord,
-) -> Vec<u8> {
+fn encode_change_cipher_spec_record(change_cipher_spec_record: &ChangeCipherSpecRecord) -> Vec<u8> {
     let mut data_bytes: Vec<u8> = Vec::new();
     data_bytes.push(change_cipher_spec_record.record_type);
     data_bytes.extend_from_slice(&change_cipher_spec_record.protocol_version);
     data_bytes.extend_from_slice(&change_cipher_spec_record.change_cipher_specs_length);
     data_bytes.push(change_cipher_spec_record.change_cipher_specs);
+    data_bytes
+}
+
+fn encode_handshake_finished_record(
+    handshake_finished_record: &HandshakeFinishedRecord,
+) -> Vec<u8> {
+    let handshake_header = encode_handshake_header(&handshake_finished_record.handshake_header);
+
+    let mut data_bytes: Vec<u8> = Vec::new();
+    data_bytes.extend_from_slice(&handshake_header);
+    data_bytes.extend_from_slice(&handshake_finished_record.verify_data);
     data_bytes
 }
 
@@ -90,10 +124,11 @@ pub fn get_server_hello_record_bytes() -> Vec<u8> {
     encode_hello_record(&TLS_SERVER_HELLO)
 }
 
-pub fn get_server_certificate_record_bytes() -> Vec<u8> {
-    let path = env::var("PATH_SERVER_CERT_DIR").unwrap();
+pub fn get_server_certificate_record_bytes() -> Result<Vec<u8>, EncoderError> {
+    let path =
+        env::var("PATH_SERVER_CERT_DIR").map_err(|_| EncoderError::CertificateEnvVarReadError)?;
 
-    let certificate = read_file_to_bytes(&path).expect("could not read certificate file");
+    let certificate = read_file_to_bytes(&path).map_err(|_| EncoderError::CertificateReadError)?;
     let certificate_length = certificate.len();
 
     let record = ServerCertificateRecord {
@@ -111,7 +146,7 @@ pub fn get_server_certificate_record_bytes() -> Vec<u8> {
         certificate,
     };
 
-    encode_server_certificate_record(&record)
+    Ok(encode_server_certificate_record(&record))
 }
 
 pub fn get_server_hello_done_record_bytes() -> [u8; 9] {
@@ -122,30 +157,36 @@ pub fn get_server_change_cipher_spec_record_bytes() -> Vec<u8> {
     encode_change_cipher_spec_record(&TLS_SERVER_CHANGE_CIPHER_SPEC)
 }
 
-pub fn get_server_handshake_finished_record_bytes(encryption_length: usize, encryption_iv: [u8; 16], encrypted_data: Vec<u8>) -> Vec<u8> {
-    let record = get_server_application_data_record(encryption_length, encryption_iv, encrypted_data);
-    encode_application_data_record(&record)
+pub fn get_server_handshake_finished_record_bytes(
+    context: &SessionContext,
+    state: &SessionState,
+) -> Vec<u8> {
+    let verify_data = compute_verify_data(&context, &state);
+    let verify_data_len = verify_data.len();
+
+    let record = HandshakeFinishedRecord {
+        handshake_header: HandshakeHeader {
+            handshake_type: TLS_HANDSHAKE_FINISHED,
+            data_message_length: convert_usize_to_3_bytes(verify_data_len),
+        },
+        verify_data,
+    };
+    encode_handshake_finished_record(&record)
 }
 
-pub fn get_server_application_data_record_bytes(encryption_length: usize, encryption_iv: [u8; 16], encrypted_data: Vec<u8>) -> Vec<u8> {
-    let record = get_server_application_data_record(encryption_length, encryption_iv, encrypted_data);
-    encode_application_data_record(&record)
-}
-
-fn get_server_application_data_record(
+pub fn get_server_application_data_record_bytes(
     encryption_length: usize,
-    encryption_iv: [u8; 16],
-    encrypted_data: Vec<u8>,
-) -> ApplicationDataRecord {
-    ApplicationDataRecord {
+    encryption_iv: &Vec<u8>,
+    encrypted_data: &Vec<u8>,
+) -> Vec<u8> {
+    let record = ApplicationDataRecord {
         record_header: RecordHeader {
             record_type: TLS_RECORD_HANDSHAKE,
             protocol_version: TLS_PROTOCOL_VERSION,
-            handshake_message_length: convert_usize_to_bytes(encryption_length)
-                .try_into()
-                .unwrap(),
+            handshake_message_length: convert_usize_to_2_bytes(encryption_length),
         },
         encryption_iv: encryption_iv.clone(),
         encrypted_data: encrypted_data.clone(),
-    }
+    };
+    encode_application_data_record(&record)
 }
