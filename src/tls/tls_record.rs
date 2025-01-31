@@ -53,6 +53,12 @@ pub struct ChangeCipherSpecRecord {
 }
 
 #[derive(Debug, Clone)]
+pub struct HandshakeFinishedRecord {
+    pub handshake_header: HandshakeHeader,
+    pub verify_data: Vec<u8>,
+}
+
+#[derive(Debug, Clone)]
 pub struct ApplicationDataRecord {
     // used for handshake finished records as well
     pub record_header: RecordHeader,

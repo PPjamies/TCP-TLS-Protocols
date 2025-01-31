@@ -1,23 +1,20 @@
-use crate::tls::tls_record::{
-    ApplicationDataRecord, ChangeCipherSpecRecord, HandshakeHeader, HelloRecord, KeyExchangeRecord,
-    RecordHeader,
-};
+use crate::tls::tls_record::{ApplicationDataRecord, ChangeCipherSpecRecord, HandshakeFinishedRecord, HandshakeHeader, HelloRecord, KeyExchangeRecord, RecordHeader};
 
 use nom::multi::count;
 use nom::{bytes::complete::take, IResult};
 
-pub fn decode_record_type(input: &[u8]) -> IResult<&[u8], u8> {
+fn decode_record_type(input: &[u8]) -> IResult<&[u8], u8> {
     let (input, record_type) = take(1usize)(input)?;
     Ok((input, record_type[0]))
 }
 
-pub fn decode_handshake_type(input: &[u8]) -> IResult<&[u8], u8> {
+fn decode_handshake_type(input: &[u8]) -> IResult<&[u8], u8> {
     decode_record_header(input)?;
     let (input, handshake_type) = take(1usize)(input)?;
     Ok((input, handshake_type[0]))
 }
 
-pub fn decode_record_header(input: &[u8]) -> IResult<&[u8], RecordHeader> {
+fn decode_record_header(input: &[u8]) -> IResult<&[u8], RecordHeader> {
     (take(1usize), take(2usize), take(2usize))
         .map(
             |(record_type, protocol_version, handshake_message_length)| RecordHeader {
@@ -32,7 +29,7 @@ pub fn decode_record_header(input: &[u8]) -> IResult<&[u8], RecordHeader> {
         .decode(input)
 }
 
-pub fn decode_handshake_header(input: &[u8]) -> IResult<&[u8], HandshakeHeader> {
+fn decode_handshake_header(input: &[u8]) -> IResult<&[u8], HandshakeHeader> {
     (take(1usize), take(3usize))
         .map(|(handshake_type, data_message_length)| HandshakeHeader {
             handshake_type: handshake_type[0],
@@ -45,7 +42,7 @@ pub fn decode_handshake_header(input: &[u8]) -> IResult<&[u8], HandshakeHeader> 
         .decode(input)
 }
 
-pub fn decode_hello_record(input: &[u8]) -> IResult<&[u8], HelloRecord> {
+fn decode_hello_record(input: &[u8]) -> IResult<&[u8], HelloRecord> {
     let (input, record_header) = decode_record_header(input)?;
     let (input, handshake_header) = decode_handshake_header(input)?;
     let (input, version) = take(2usize)(input)?;
@@ -74,7 +71,7 @@ pub fn decode_hello_record(input: &[u8]) -> IResult<&[u8], HelloRecord> {
     ))
 }
 
-pub fn decode_key_exchange_record(input: &[u8]) -> IResult<&[u8], KeyExchangeRecord> {
+fn decode_key_exchange_record(input: &[u8]) -> IResult<&[u8], KeyExchangeRecord> {
     let (input, record_header) = decode_record_header(input)?;
     let (input, handshake_header) = decode_handshake_header(input)?;
     let (input, premaster_secret) = input.iter().collect();
@@ -89,7 +86,7 @@ pub fn decode_key_exchange_record(input: &[u8]) -> IResult<&[u8], KeyExchangeRec
     ))
 }
 
-pub fn decode_change_cipher_spec_record(input: &[u8]) -> IResult<&[u8], ChangeCipherSpecRecord> {
+fn decode_change_cipher_spec_record(input: &[u8]) -> IResult<&[u8], ChangeCipherSpecRecord> {
     let (input, record_type) = take(1usize)(input)?;
     let (input, protocol_version) = take(2usize)(input)?;
     let (input, change_cipher_specs_length) = take(2usize)(input)?;
@@ -109,7 +106,7 @@ pub fn decode_change_cipher_spec_record(input: &[u8]) -> IResult<&[u8], ChangeCi
     ))
 }
 
-pub fn decode_application_data_record(input: &[u8]) -> IResult<&[u8], ApplicationDataRecord> {
+fn decode_application_data_record(input: &[u8]) -> IResult<&[u8], ApplicationDataRecord> {
     let (input, record_header) = decode_record_header(input)?;
     let (input, encryption_iv) = take(16usize)(input)?;
     let (input, encrypted_data) = input.iter().collect();
@@ -123,3 +120,67 @@ pub fn decode_application_data_record(input: &[u8]) -> IResult<&[u8], Applicatio
         },
     ))
 }
+
+fn decode_handshake_finished_record(input: &[u8]) -> IResult<&[u8], HandshakeFinishedRecord> {
+    let (input, handshake_header) = decode_handshake_header(input)?;
+    let (input, verify_data) = input.iter().collect();
+
+    Ok((input, HandshakeFinishedRecord { handshake_header, verify_data }))
+}
+
+//todo:
+pub fn get_record_type(input: &[u8]) -> IResult<&[u8], u8> {
+    decode_record_type(input)
+}
+
+pub fn get_handshake_type(input: &[u8]) -> IResult<&[u8], u8> {
+    decode_handshake_type(input)
+}
+
+//TODO:
+pub fn get_client_hello_record(input: &[u8]) -> HelloRecord {
+    let record = decode_hello_record(input)?;
+
+    // validate record
+}
+
+pub fn get_client_key_exchange_record(input: &[u8]) -> KeyExchangeRecord {
+    let record = decode_key_exchange_record(input)?;
+}
+
+pub fn get_client_change_cipher_spec_record(input: &[u8]) -> ChangeCipherSpecRecord {
+    let record = decode_change_cipher_spec_record(input)?;
+}
+
+pub fn get_client_handshake_finished_record(input: &[u8]) -> HandshakeFinishedRecord {
+    let record = decode_handshake_finished_record(input)?;
+}
+
+pub fn get_client_alert_record(input: &[u8]) -> ApplicationDataRecord {
+    let record = decode_application_data_record(input)?;
+}
+
+pub fn get_client_application_data_record(input: &[u8]) -> ApplicationDataRecord {
+    let record = decode_application_data_record(input)?;
+}
+
+
+// fn is_valid_client_hello_record(hello_record: HelloRecord) -> bool {
+//     if record_type != crate::tls::tls_handler::TLS_RECORD_HANDSHAKE {
+//         return Err(TlsHandlerError::InvalidRecord(record_type));
+//     }
+//
+//     if protocol_version != crate::tls::tls_handler::TLS_PROTOCOL_VERSION {
+//         return Err(TlsHandlerError::ProtocolNotSupported(crate::tls::tls_handler::TLS_PROTOCOL_VERSION));
+//     }
+//
+//     if handshake_type != crate::tls::tls_handler::TLS_HANDSHAKE_CLIENT_HELLO {
+//         return Err(TlsHandlerError::InvalidHandshake(handshake_type));
+//     }
+//
+//     if cipher_suite != crate::tls::tls_handler::TLS_RSA_AES_128_CBC_SHA_256 {
+//         return Err(TlsHandlerError::CipherNotSupported(cipher_suite));
+//     }
+//
+//     true
+// }
