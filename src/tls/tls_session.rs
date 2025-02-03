@@ -1,3 +1,6 @@
+use crate::tls::tls_constants::{TLS_HANDSHAKE_CLIENT_HELLO, TLS_HANDSHAKE_SERVER_HELLO};
+use crate::tls::tls_record::HelloRecord;
+use crate::tls::tls_record_decoder::get_hello_record;
 use crate::tls::tls_utils::read_file_to_bytes;
 use openssl::hash::{Hasher, MessageDigest};
 use openssl::pkey::{PKey, Private};
@@ -10,6 +13,7 @@ use std::result::Result;
 
 #[derive(Debug)]
 pub enum HandshakeError {
+    DecodeFailed,
     EncryptionFailed,
     DecryptionFailed,
     PremasterSecretDecryptionFailed,
@@ -34,6 +38,9 @@ pub enum HandshakeError {
 impl std::fmt::Display for HandshakeError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
+            HandshakeError::DecodeFailed => {
+                write!(f, "Failed to decode payload")
+            }
             HandshakeError::EncryptionFailed => write!(f, "Encryption failed"),
             HandshakeError::DecryptionFailed => write!(f, "Decryption failed"),
             HandshakeError::PremasterSecretDecryptionFailed => {
@@ -117,16 +124,32 @@ impl SessionContext {
         }
     }
 
-    pub fn get_client_random(&self) -> [u8; 32] {
-
+    pub fn get_client_random(&self) -> Result<[u8; 32], HandshakeError> {
+        let record =
+            self.get_hello_record(&self.client_hello_record, &TLS_HANDSHAKE_CLIENT_HELLO)?;
+        Ok(record.random)
     }
 
-    pub fn get_server_random(&self) -> [u8; 32] {
-
+    pub fn get_server_random(&self) -> Result<[u8; 32], HandshakeError> {
+        let record =
+            self.get_hello_record(&self.server_hello_record, &TLS_HANDSHAKE_SERVER_HELLO)?;
+        Ok(record.random)
     }
 
-    pub fn get_server_session_id(&self) -> [u8; 32] {
+    pub fn get_server_session_id(&self) -> Result<[u8; 32], HandshakeError> {
+        let record =
+            self.get_hello_record(&self.server_hello_record, &TLS_HANDSHAKE_SERVER_HELLO)?;
+        Ok(record.session_id)
+    }
 
+    fn get_hello_record(
+        &self,
+        hello_record: &[u8],
+        handshake_header_type: &u8,
+    ) -> Result<HelloRecord, HandshakeError> {
+        let hello_record = get_hello_record(&hello_record, handshake_header_type)
+            .map_err(|_| HandshakeError::DecodeFailed)?;
+        Ok(hello_record)
     }
 }
 
@@ -287,7 +310,7 @@ pub fn validate_verify_data(
     context: &SessionContext,
     verify_data: &Vec<u8>,
 ) -> Result<(), HandshakeError> {
-    let computed_verify_data = get_verify_data(&state, &context);
+    let computed_verify_data = get_verify_data(&state, &context)?;
 
     if *verify_data != computed_verify_data {
         return Err(HandshakeError::InvalidVerifyData);
@@ -296,11 +319,14 @@ pub fn validate_verify_data(
     Ok(())
 }
 
-pub fn get_verify_data(state: &SessionState, context: &SessionContext) -> Vec<u8> {
+pub fn get_verify_data(
+    state: &SessionState,
+    context: &SessionContext,
+) -> Result<Vec<u8>, HandshakeError> {
     let mac_key = &state.session_keys.as_ref().unwrap().mac_key;
 
-    let client_random = &context.get_client_random();
-    let server_random = &context.get_server_random();
+    let client_random = &context.get_client_random()?;
+    let server_random = &context.get_server_random()?;
 
     let mut handshake_messages_bytes = Vec::new();
     handshake_messages_bytes.extend_from_slice(&context.client_hello_record);
@@ -310,12 +336,12 @@ pub fn get_verify_data(state: &SessionState, context: &SessionContext) -> Vec<u8
     handshake_messages_bytes.extend_from_slice(&context.client_key_exchange_record);
     handshake_messages_bytes.extend_from_slice(&context.client_change_cipher_spec_record);
 
-    compute_verify_data(
+    Ok(compute_verify_data(
         &mac_key,
         &client_random,
         &server_random,
         &handshake_messages_bytes,
-    )
+    ))
 }
 
 fn compute_verify_data(

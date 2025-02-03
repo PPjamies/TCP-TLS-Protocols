@@ -7,7 +7,7 @@ use crate::tls::tls_record::{
     ApplicationDataRecord, ChangeCipherSpecRecord, HandshakeFinishedRecord, HandshakeHeader,
     HelloRecord, RecordHeader, ServerCertificateRecord, ServerHelloDoneRecord,
 };
-use crate::tls::tls_session::compute_verify_data;
+use crate::tls::tls_session::{get_verify_data, HandshakeError};
 use crate::tls::tls_utils::{
     convert_usize_to_2_bytes, convert_usize_to_3_bytes, read_file_to_bytes,
 };
@@ -160,8 +160,8 @@ pub fn get_server_change_cipher_spec_record_bytes() -> Vec<u8> {
 pub fn get_server_handshake_finished_record_bytes(
     context: &SessionContext,
     state: &SessionState,
-) -> Vec<u8> {
-    let verify_data = compute_verify_data(&context, &state);
+) -> Result<Vec<u8>, HandshakeError> {
+    let verify_data = get_verify_data(&state, &context)?;
     let verify_data_len = verify_data.len();
 
     let record = HandshakeFinishedRecord {
@@ -171,7 +171,7 @@ pub fn get_server_handshake_finished_record_bytes(
         },
         verify_data,
     };
-    encode_handshake_finished_record(&record)
+    Ok(encode_handshake_finished_record(&record))
 }
 
 pub fn get_server_application_data_record_bytes(

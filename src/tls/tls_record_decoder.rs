@@ -19,6 +19,7 @@ pub enum DecoderError {
     RecordTypeNotFound,
     HandshakeTypeNotFound,
     InvalidClientHelloRecord,
+    InvalidHelloRecord,
     InvalidClientKeyExchangeRecord,
     InvalidClientChangeCipherSpecRecord,
     InvalidClientHandshakeFinishedRecord,
@@ -37,6 +38,7 @@ impl std::fmt::Display for DecoderError {
             DecoderError::RecordTypeNotFound => write!(f, "Record type not found"),
             DecoderError::HandshakeTypeNotFound => write!(f, "Handshake type not found"),
             DecoderError::InvalidClientHelloRecord => write!(f, "Invalid Client Hello Record"),
+            DecoderError::InvalidHelloRecord => write!(f, "Invalid Hello Record"),
             DecoderError::InvalidClientKeyExchangeRecord => {
                 write!(f, "Invalid Client Key Exchange Record")
             }
@@ -242,6 +244,28 @@ pub fn get_client_hello_record(input: &[u8]) -> Result<HelloRecord, DecoderError
 
     validate_record_header(&record.record_header, &TLS_RECORD_HANDSHAKE)?;
     validate_handshake_header(&record.handshake_header, &TLS_HANDSHAKE_CLIENT_HELLO)?;
+
+    let contains_supported_cipher_suite = &record
+        .cipher_suites
+        .iter()
+        .any(|cipher_suite| cipher_suite == &TLS_RSA_AES_128_CBC_SHA_256);
+
+    if !contains_supported_cipher_suite {
+        return Err(DecoderError::UnsupportedCipherSuite);
+    }
+    Ok(record)
+}
+
+pub fn get_hello_record(
+    input: &[u8],
+    handshake_header_type: &u8,
+) -> Result<HelloRecord, DecoderError> {
+    let record = decode_hello_record(input)
+        .map(|(_, record)| record)
+        .map_err(DecoderError::InvalidHelloRecord)?;
+
+    validate_record_header(&record.record_header, &TLS_RECORD_HANDSHAKE)?;
+    validate_handshake_header(&record.handshake_header, &handshake_header_type)?;
 
     let contains_supported_cipher_suite = &record
         .cipher_suites
