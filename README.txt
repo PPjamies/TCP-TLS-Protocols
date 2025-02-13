@@ -141,20 +141,3 @@ Server Hello Done
 * message_type (1 byte)
 * length (12 bytes - SHA 256) - length of the hash
 * finished hash (variable bytes) - the hash of the entire handshake signed by the server's private key */
-
-// record_header: RecordHeader {
-//     record_type: 0x16,              // HANDSHAKE
-//     protocol_version: [0x03, 0x03], //TLS 1.2
-//     length: [0x00, 0x03],           // BYTES OF HANDSHAKE HEADER
-// },
-// handshake_header: HandshakeHeader {
-//     handshake_type: 0x01, // CLIENT HELLO
-//     length: [0x00, 0x46], // BYTES OF CLIENT HELLO DATA
-// },
-// hello_record: HelloRecord {
-//     version: [0x03, 0x03],
-//     random: generate_server_random(),
-//     session_id: generate_random_32_bytes(),
-//     cipher_suite: [0x00, 0x3C], // TLS RSA with AES 128 CBC SHA
-//     compression_method: [0x01, 0x00],
-// },
